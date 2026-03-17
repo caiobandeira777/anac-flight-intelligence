@@ -1,0 +1,26 @@
+# ============================================================
+#  requirements.txt — instale com: pip install -r requirements.txt
+# ============================================================
+
+# processamento de dados
+polars>=0.20.0          # substitui pandas para arquivos grandes (20GB)
+pandas>=2.0.0           # usado pontualmente para janelas móveis
+numpy>=1.26.0
+
+# deep learning
+torch>=2.1.0            # PyTorch — backbone de todos os modelos neurais
+torchvision>=0.16.0     # utilitários de visão (opcional, mas útil)
+
+# gradient boosting (modelo de bagagem)
+lightgbm>=4.1.0         # muito mais rápido que XGBoost para este volume
+
+# ML utilitários
+scikit-learn>=1.3.0     # LabelEncoder, StandardScaler, métricas
+
+# API
+fastapi>=0.104.0        # framework web assíncrono
+uvicorn[standard]>=0.24.0  # servidor ASGI para FastAPI
+pydantic>=2.4.0         # validação de esquemas da API
+
+# experimentos (opcional mas recomendado)
+mlflow>=2.8.0           # rastreamento de experimentos

@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANAC Intelligence — Previsão de Voos</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c14;
+    --surface: #0d1420;
+    --surface2: #131c2e;
+    --border: rgba(99,179,237,0.12);
+    --accent: #63b3ed;
+    --accent2: #f6ad55;
+    --green: #68d391;
+    --red: #fc8181;
+    --yellow: #f6e05e;
+    --text: #e2e8f0;
+    --muted: #718096;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(99,179,237,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,179,237,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* ── HEADER ── */
+  header {
+    padding: 32px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), #4299e1);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .status-dot {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── MAIN GRID ── */
+  .main-grid { display: grid; grid-template-columns: 380px 1fr; gap: 24px; align-items: start; }
+
+  /* ── FORM CARD ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+  .card-title {
+    font-size: 11px; font-family: var(--mono);
+    color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block; font-family: var(--mono); font-size: 10px;
+    color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .form-group input, .form-group select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+  .form-group input:focus, .form-group select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(99,179,237,0.1);
+  }
+  .form-group select option { background: var(--surface2); }
+
+  .btn-predict {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, var(--accent), #4299e1);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: opacity 0.2s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-predict:hover { opacity: 0.9; }
+  .btn-predict:active { transform: scale(0.98); }
+  .btn-predict.loading { opacity: 0.7; cursor: wait; }
+  .btn-predict .spinner {
+    display: none;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── RESULTS ── */
+  .results-area { display: flex; flex-direction: column; gap: 16px; }
+
+  .placeholder {
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 16px;
+    padding: 60px 40px;
+    text-align: center;
+  }
+  .placeholder-icon { font-size: 40px; margin-bottom: 16px; opacity: 0.4; }
+  .placeholder p { color: var(--muted); font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+
+  /* metric cards */
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s;
+    animation: fadeUp 0.4s ease both;
+  }
+  .metric-card:hover { transform: translateY(-2px); }
+  @keyframes fadeUp { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: translateY(0); } }
+  .metric-card:nth-child(1) { animation-delay: 0.05s; }
+  .metric-card:nth-child(2) { animation-delay: 0.10s; }
+  .metric-card:nth-child(3) { animation-delay: 0.15s; }
+  .metric-card:nth-child(4) { animation-delay: 0.20s; }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .metric-card.green::before { background: var(--green); }
+  .metric-card.yellow::before { background: var(--yellow); }
+  .metric-card.red::before { background: var(--red); }
+  .metric-card.blue::before { background: var(--accent); }
+
+  .metric-label {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .metric-value {
+    font-size: 32px; font-weight: 800;
+    letter-spacing: -1px; line-height: 1;
+    margin-bottom: 6px;
+  }
+  .metric-sub {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--muted);
+  }
+  .metric-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+  .badge-green  { background: rgba(104,211,145,0.15); color: var(--green); }
+  .badge-yellow { background: rgba(246,224,94,0.15);  color: var(--yellow); }
+  .badge-red    { background: rgba(252,129,129,0.15); color: var(--red); }
+  .badge-blue   { background: rgba(99,179,237,0.15);  color: var(--accent); }
+
+  /* gauge bar */
+  .gauge-wrap { margin-top: 12px; }
+  .gauge-track {
+    height: 4px; background: var(--surface2);
+    border-radius: 2px; overflow: hidden;
+  }
+  .gauge-fill {
+    height: 100%; border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* resumo card */
+  .resumo-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    animation: fadeUp 0.4s ease 0.25s both;
+  }
+  .resumo-title {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .resumo-lines { display: flex; flex-direction: column; gap: 14px; }
+  .resumo-line {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px;
+    background: var(--surface2);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 12px;
+    line-height: 1.6; color: var(--text);
+  }
+  .resumo-emoji { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+  /* historico section */
+  .hist-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    animation: fadeUp 0.4s ease 0.30s both;
+  }
+  .hist-title {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--accent2); letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .hist-bars { display: flex; align-items: flex-end; gap: 4px; height: 80px; }
+  .hist-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .hist-bar {
+    width: 100%; border-radius: 3px 3px 0 0;
+    transition: height 0.6s cubic-bezier(0.4,0,0.2,1);
+    cursor: pointer;
+    position: relative;
+  }
+  .hist-bar:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%; transform: translateX(-50%);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .hist-label {
+    font-family: var(--mono); font-size: 9px;
+    color: var(--muted); text-align: center;
+  }
+
+  /* error toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--red); color: #fff;
+    padding: 12px 20px; border-radius: 10px;
+    font-family: var(--mono); font-size: 13px;
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.3s;
+    z-index: 100;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* route display */
+  .route-display {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 12px;
+    color: var(--muted); margin-bottom: 20px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .route-iata { color: var(--accent); font-weight: 500; font-size: 14px; }
+  .route-arrow { color: var(--muted); }
+
+  @media (max-width: 800px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">✈</div>
+        <div>
+          <div class="logo-text">ANAC Intelligence</div>
+          <div class="logo-sub">deep learning · aviation forecasting</div>
+        </div>
+      </div>
+      <div class="status-dot">
+        <div class="dot" id="apiDot"></div>
+        <span id="apiStatus">conectando...</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- FORM -->
+    <div class="card">
+      <div class="card-title">// parâmetros do voo</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Origem (ICAO)</label>
+          <input type="text" id="origem" value="SBGR" placeholder="SBGR" maxlength="4" style="text-transform:uppercase">
+        </div>
+        <div class="form-group">
+          <label>Destino (ICAO)</label>
+          <input type="text" id="destino" value="SBPA" placeholder="SBPA" maxlength="4" style="text-transform:uppercase">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Empresa Aérea</label>
+        <select id="empresa">
+          <option value="TAM">LATAM (TAM)</option>
+          <option value="GOL">GOL</option>
+          <option value="AZU">Azul</option>
+          <option value="ONE">One (antiga Avianca)</option>
+          <option value="PTB">Passaredo</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Data do Voo</label>
+          <input type="date" id="data_voo" value="2024-06-14">
+        </div>
+        <div class="form-group">
+          <label>Hora (0–23)</label>
+          <input type="number" id="hora" value="18" min="0" max="23">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Assentos</label>
+          <input type="number" id="assentos" value="180" min="1">
+        </div>
+        <div class="form-group">
+          <label>Distância (km)</label>
+          <input type="number" id="distancia" value="1100" min="1">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Continente Destino</label>
+        <select id="continente">
+          <option value="América do Sul">América do Sul</option>
+          <option value="América do Norte">América do Norte</option>
+          <option value="Europa">Europa</option>
+          <option value="África">África</option>
+          <option value="Ásia">Ásia</option>
+          <option value="Oceania">Oceania</option>
+        </select>
+      </div>
+
+      <button class="btn-predict" id="btnPredict" onclick="prever()">
+        <span id="btnText">Gerar Previsão</span>
+        <div class="spinner" id="spinner"></div>
+      </button>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="results-area" id="results">
+      <div class="placeholder">
+        <div class="placeholder-icon">📡</div>
+        <p>Preencha os dados do voo e clique<br>em <strong>Gerar Previsão</strong> para ver<br>as predições dos 4 modelos.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://localhost:8000';
+
+// verifica status da API
+async function checkApi() {
+  try {
+    const r = await fetch(`${API}/health`);
+    const d = await r.json();
+    document.getElementById('apiDot').style.background = d.todos_prontos ? 'var(--green)' : 'var(--yellow)';
+    document.getElementById('apiDot').style.boxShadow = d.todos_prontos ? '0 0 8px var(--green)' : '0 0 8px var(--yellow)';
+    document.getElementById('apiStatus').textContent = d.todos_prontos ? `api online · ${d.modelos.length} modelos` : 'modelos carregando...';
+  } catch {
+    document.getElementById('apiDot').style.background = 'var(--red)';
+    document.getElementById('apiDot').style.boxShadow = '0 0 8px var(--red)';
+    document.getElementById('apiStatus').textContent = 'api offline';
+  }
+}
+checkApi();
+setInterval(checkApi, 10000);
+
+function getDiaSemana(dataStr) {
+  const dias = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+  return dias[new Date(dataStr + 'T12:00:00').getDay()];
+}
+
+function getMes(dataStr) {
+  return parseInt(dataStr.split('-')[1]);
+}
+
+function getSemana(dataStr) {
+  const d = new Date(dataStr);
+  const start = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil(((d - start) / 86400000 + start.getDay() + 1) / 7);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+function getColor(val, thresholds) {
+  if (val >= thresholds[1]) return 'red';
+  if (val >= thresholds[0]) return 'yellow';
+  return 'green';
+}
+
+function pct(v) { return Math.round(v * 100); }
+
+async function prever() {
+  const btn = document.getElementById('btnPredict');
+  const txt = document.getElementById('btnText');
+  const spin = document.getElementById('spinner');
+
+  const dataVoo = document.getElementById('data_voo').value;
+  if (!dataVoo) { showToast('Selecione uma data de voo'); return; }
+
+  // loading state
+  btn.classList.add('loading');
+  txt.style.display = 'none';
+  spin.style.display = 'block';
+
+  const body = {
+    aeroporto_origem:   document.getElementById('origem').value.toUpperCase(),
+    aeroporto_destino:  document.getElementById('destino').value.toUpperCase(),
+    empresa:            document.getElementById('empresa').value,
+    data_voo:           dataVoo,
+    hora_partida:       parseInt(document.getElementById('hora').value),
+    mes:                getMes(dataVoo),
+    dia_semana:         getDiaSemana(dataVoo),
+    assentos:           parseInt(document.getElementById('assentos').value),
+    distancia_km:       parseFloat(document.getElementById('distancia').value),
+    continente_destino: document.getElementById('continente').value,
+    semana_ano:         getSemana(dataVoo),
+  };
+
+  try {
+    const res = await fetch(`${API}/prever`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      showToast('Erro: ' + (err.detail || res.statusText));
+      return;
+    }
+
+    const d = await res.json();
+    renderResults(d, body);
+
+    // busca histórico
+    try {
+      const hr = await fetch(`${API}/historico?origem=${body.aeroporto_origem}&destino=${body.aeroporto_destino}`);
+      if (hr.ok) renderHistorico(await hr.json());
+    } catch {}
+
+  } catch (e) {
+    showToast('Não foi possível conectar à API em localhost:8000');
+  } finally {
+    btn.classList.remove('loading');
+    txt.style.display = 'block';
+    spin.style.display = 'none';
+  }
+}
+
+function renderResults(d, body) {
+  const corAero   = getColor(d.prob_aeroporto_cheio, [0.5, 0.75]);
+  const corAss    = getColor(d.taxa_ocupacao_voo,    [0.7, 0.9]);
+  const corPreco  = {'desconto':'green','normal':'blue','premium':'yellow','máximo':'red'}[d.recomendacao_preco] || 'blue';
+  const corBag    = d.recomendar_cobranca ? 'red' : 'green';
+
+  const badgeLabel = {'desconto':'↓ desconto','normal':'● normal','premium':'↑ premium','máximo':'⚠ máximo'};
+
+  const resumoLinhas = d.resumo.split('\n\n').filter(Boolean).map(l => {
+    const emoji = l.match(/^([\uD800-\uDFFF].|[^\w\s])/u)?.[0] || '●';
+    return `<div class="resumo-line">
+      <span class="resumo-emoji">${emoji}</span>
+      <span>${l.replace(/^[\uD800-\uDFFF].|^[^\w\s]/u, '').trim()}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('results').innerHTML = `
+    <div class="route-display">
+      <span class="route-iata">${body.aeroporto_origem}</span>
+      <span class="route-arrow">──✈──</span>
+      <span class="route-iata">${body.aeroporto_destino}</span>
+      <span style="margin-left:auto">${body.dia_semana} · ${body.hora_partida}h · ${body.empresa}</span>
+    </div>
+
+    <div class="metrics-grid">
+
+      <div class="metric-card ${corAero}">
+        <div class="metric-label">lotação aeroporto</div>
+        <div class="metric-value" style="color:var(--${corAero === 'green' ? 'green' : corAero === 'yellow' ? 'yellow' : 'red'})">${pct(d.prob_aeroporto_cheio)}%</div>
+        <div class="metric-sub">probabilidade de movimento</div>
+        <div class="gauge-wrap">
+          <div class="gauge-track">
+            <div class="gauge-fill" style="width:${pct(d.prob_aeroporto_cheio)}%;background:var(--${corAero === 'green' ? 'green' : corAero === 'yellow' ? 'yellow' : 'red'})"></div>
+          </div>
+        </div>
+        <span class="metric-badge badge-${corAero}">${d.lotacao_aeroporto}</span>
+      </div>
+
+      <div class="metric-card ${corAss}">
+        <div class="metric-label">ocupação do voo</div>
+        <div class="metric-value" style="color:var(--${corAss === 'green' ? 'green' : corAss === 'yellow' ? 'yellow' : 'red'})">${pct(d.taxa_ocupacao_voo)}%</div>
+        <div class="metric-sub">${d.assentos_vazios_est} assentos vazios est.</div>
+        <div class="gauge-wrap">
+          <div class="gauge-track">
+            <div class="gauge-fill" style="width:${pct(d.taxa_ocupacao_voo)}%;background:var(--${corAss === 'green' ? 'green' : corAss === 'yellow' ? 'yellow' : 'red'})"></div>
+          </div>
+        </div>
+        <span class="metric-badge badge-${corAss}">${d.bucket_ocupacao}</span>
+      </div>
+
+      <div class="metric-card ${corPreco}">
+        <div class="metric-label">pressão de preço</div>
+        <div class="metric-value" style="color:var(--${corPreco === 'blue' ? 'accent' : corPreco === 'green' ? 'green' : corPreco === 'yellow' ? 'yellow' : 'red'})">${Math.round(d.pressao_preco * 100)}<span style="font-size:16px;font-weight:400">/100</span></div>
+        <div class="metric-sub">índice de demanda</div>
+        <div class="gauge-wrap">
+          <div class="gauge-track">
+            <div class="gauge-fill" style="width:${Math.round(d.pressao_preco*100)}%;background:var(--${corPreco === 'blue' ? 'accent' : corPreco === 'green' ? 'green' : corPreco === 'yellow' ? 'yellow' : 'red'})"></div>
+          </div>
+        </div>
+        <span class="metric-badge badge-${corPreco}">${badgeLabel[d.recomendacao_preco] || d.recomendacao_preco}</span>
+      </div>
+
+      <div class="metric-card ${corBag}">
+        <div class="metric-label">excesso de bagagem</div>
+        <div class="metric-value" style="color:var(--${corBag === 'green' ? 'green' : 'red'})">${pct(d.prob_excesso_bagagem)}%</div>
+        <div class="metric-sub">${d.recomendar_cobranca ? 'cobrar despacho' : 'não cobrar despacho'}</div>
+        <div class="gauge-wrap">
+          <div class="gauge-track">
+            <div class="gauge-fill" style="width:${pct(d.prob_excesso_bagagem)}%;background:var(--${corBag === 'green' ? 'green' : 'red'})"></div>
+          </div>
+        </div>
+        <span class="metric-badge badge-${corBag}">${d.recomendar_cobranca ? '⚠ cobrar' : '✓ dispensar'}</span>
+      </div>
+
+    </div>
+
+    <div class="resumo-card">
+      <div class="resumo-title">// análise completa</div>
+      <div class="resumo-lines">${resumoLinhas}</div>
+    </div>
+
+    <div class="hist-section" id="histSection" style="display:none">
+      <div class="hist-title">// histórico de ocupação — ${body.aeroporto_origem} → ${body.aeroporto_destino}</div>
+      <div class="hist-bars" id="histBars"></div>
+    </div>
+  `;
+}
+
+function renderHistorico(data) {
+  if (!data || !data.meses) return;
+  const section = document.getElementById('histSection');
+  const bars    = document.getElementById('histBars');
+  if (!section || !bars) return;
+  section.style.display = 'block';
+
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const max   = Math.max(...data.meses.map(m => m.ocupacao_media));
+
+  bars.innerHTML = data.meses.map((m, i) => {
+    const h   = Math.round((m.ocupacao_media / max) * 72);
+    const cor = m.ocupacao_media > 0.85 ? 'var(--red)' : m.ocupacao_media > 0.70 ? 'var(--yellow)' : 'var(--green)';
+    return `<div class="hist-bar-wrap">
+      <div class="hist-bar" style="height:${h}px;background:${cor}" data-tip="${meses[i]}: ${Math.round(m.ocupacao_media*100)}%"></div>
+      <div class="hist-label">${meses[i]}</div>
+    </div>`;
+  }).join('');
+}
+
+// submit on Enter
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') prever();
+});
+</script>
+</body>
+</html>

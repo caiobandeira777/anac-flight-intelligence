@@ -1,0 +1,45 @@
+# ============================================================
+#  docker-compose.yml — ANAC Intelligence
+#  Sobe a API + dashboard em um único comando:
+#      docker-compose up --build
+#  Para em background:
+#      docker-compose up -d --build
+#  Parar:
+#      docker-compose down
+# ============================================================
+
+version: "3.9"
+
+services:
+
+  # ── API de predição ────────────────────────────────────────
+  api:
+    build: .                          # usa o Dockerfile desta pasta
+    container_name: anac-api
+    ports:
+      - "8000:8000"                   # expõe porta 8000 no host
+    volumes:
+      - ./models:/app/models          # monta modelos como volume
+      - ./data/features:/app/data/features   # monta features para /historico
+      - ./data/drift:/app/data/drift  # monta pasta de relatórios de drift
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped           # reinicia automaticamente se cair
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s                   # verifica a cada 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s               # aguarda 20s antes da primeira checagem
+
+  # ── Dashboard (servidor estático simples) ──────────────────
+  dashboard:
+    image: nginx:alpine               # servidor web leve para servir o HTML
+    container_name: anac-dashboard
+    ports:
+      - "3000:80"                     # dashboard disponível em localhost:3000
+    volumes:
+      - ./dashboard.html:/usr/share/nginx/html/index.html:ro
+    depends_on:
+      - api
+    restart: unless-stopped
