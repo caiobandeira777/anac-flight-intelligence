@@ -4,6 +4,12 @@
 
 ---
 
+## 📸 Dashboard Preview
+
+![Dashboard](https://raw.githubusercontent.com/caiobandeira777/anac-flight-intelligence/main/dashboard%20screenshots.png)
+
+---
+
 ## 🧠 Models & Architecture
 
 This project trains **4 independent deep learning models** on the [ANAC Brazilian Civil Aviation dataset](https://www.gov.br/anac/pt-br/assuntos/dados-e-estatisticas/dados-estatisticos), covering domestic and international flights from 2000 to 2025.
@@ -51,7 +57,7 @@ This project trains **4 independent deep learning models** on the [ANAC Brazilia
 ### Option 1 — Docker (recommended)
 
 ```bash
-git clone https://github.com/caiobandeira/anac-flight-intelligence.git
+git clone https://github.com/caiobandeira777/anac-flight-intelligence.git
 cd anac-flight-intelligence
 
 # Download ANAC data → data/raw/
